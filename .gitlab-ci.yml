@@ -1,0 +1,56 @@
+variables:
+    GIT_STRATEGY: fetch
+    # i runner sono configurati per utilizzare la cartella /opt/deploy/
+    # valorizzando GIT_CLONE_PATH si eliminano tutte le cartelle inutili:
+    # questo /opt/deploy/builds/SEZ2_SWa/0/bioinformatics/map/wf/base
+    # diventa /opt/deploy/build/base
+    GIT_CLONE_PATH: $CI_BUILDS_DIR/$CI_PROJECT_NAME
+    SINGULARITY_IMAGE: git.ifom.eu:5050/bioinformatics/map/wf/singularity-in-docker:latest
+    IMAGE_TAG: ${CI_REGISTRY_IMAGE}:$CI_COMMIT_REF_SLUG
+    IMAGE_TAG_LATEST: ${CI_REGISTRY_IMAGE}:latest
+
+stages:
+  - cleanup_build
+  - build
+  - sif
+
+before_script:
+  - export ENGINE='docker'
+  - $ENGINE login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+
+cleanup_build_job:
+  stage: cleanup_build
+  script:
+    - cleanup build when failed
+  when: on_failure
+
+build:
+    tags:
+      - wf
+      - test
+      - docker
+    except:
+      - branches
+    stage: build
+    variables:
+    script:
+        - $ENGINE build --pull $FORMAT -t $IMAGE_TAG --file Dockerfile .
+        - $ENGINE tag $IMAGE_TAG $IMAGE_TAG_LATEST
+        - $ENGINE push $IMAGE_TAG
+        - $ENGINE push $IMAGE_TAG_LATEST
+
+sif:
+  tags:
+    - wf
+    - test
+    - docker
+  except:
+    - branches
+  stage: sif
+  variables:
+        SINGULARITY_DOCKER_USERNAME: $CI_REGISTRY_USER
+        SINGULARITY_DOCKER_PASSWORD: $CI_REGISTRY_PASSWORD
+  script:
+    - $ENGINE run --rm --privileged -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/work -v $(pwd):/tmp-singularity -e SINGULARITY_DOCKER_USERNAME -e SINGULARITY_DOCKER_PASSWORD  ${SINGULARITY_IMAGE} build ${CI_PROJECT_NAME}_${CI_COMMIT_REF_SLUG}.sif docker://${IMAGE_TAG_LATEST}
+    - $ENGINE run --rm -v singularity_images:/singularity_images -v $(pwd):/work alpine sh -c "chmod 755 /work/${CI_PROJECT_NAME}_${CI_COMMIT_REF_SLUG}.sif; mkdir -m 755 -p /singularity_images/${CI_PROJECT_PATH};  mv /work/${CI_PROJECT_NAME}_${CI_COMMIT_REF_SLUG}.sif /singularity_images/${CI_PROJECT_PATH}/;"
+    - ls -la ./
