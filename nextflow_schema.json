@@ -2,7 +2,7 @@
     "$schema": "http://json-schema.org/draft-07/schema",
     "$id": "https://raw.githubusercontent.com/nf-core/reaptec/master/nextflow_schema.json",
     "title": "nf-core/reaptec pipeline parameters",
-    "description": "Enhancer identification from 5'scRNAseq data",
+    "description": "Enhancer identification from 5prime scRNAseq data",
     "type": "object",
     "definitions": {
         "input_output_options": {
