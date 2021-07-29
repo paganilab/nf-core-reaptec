@@ -1,2 +1,10 @@
-.*~
+.nextflow*
+work/
+data/
+results/
+.DS_Store
+tests/
+testing/
+*.pyc
 *~
+manual_creation_nf-core_reaptec/
