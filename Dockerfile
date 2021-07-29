@@ -2,8 +2,11 @@ FROM docker.io/library/ubuntu:18.04
 
 LABEL eu.ifom.bioinformatics.packages.docker.author="Raoul Jean Pierre Bonnal"
 LABEL eu.ifom.bioinformatics.packages.docker.maintainer="raoul.bonnal@ifom.eu"
+LABEL authors="Akiko Oguchi <aoguchi@kuhp.kyoto-u.ac.jp>,Raoul J.P. Bonnal <raoul.bonnal@ifom.eu>,Yasuhiro Murakawa <yasuhiro.murakawa@riken.jp>" \
+      description="Docker image containing all software requirements for the nf-core/reaptec pipeline"
+
 LABEL version="0.0.1"
-LABEL descption="ReapTEC Pipeline"
+
 
 ENV TINI_VERSION="v0.18.0"
 ENV MINICONDA_VERSION="3-py39_4.9.2"
