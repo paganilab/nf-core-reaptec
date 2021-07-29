@@ -1,0 +1,146 @@
+## Test files (Test_S1_L001_R1_001.fastq.gz, Test_S1_L001_R2_001.fastq.gz, just have 23,508,149 reads each)
+These test files were made from the SRR12018267 data (human memory activated T cells).
+I used seqkit to downsample the fastq files to 5 %.
+
+## Requirements
+DONE UMI-tools (I use version: 1.0.1) (https://umi-tools.readthedocs.io/en/latest/)
+DONE cutadapt (I use version: 2.8) (https://cutadapt.readthedocs.io/en/stable/)
+DONE STAR (I use version: 2.6.0c) (https://github.com/alexdobin/STAR)
+DONE samtools (I use version: 1.10) (http://www.htslib.org)
+DONE bedtools (I use v2.29.2) (https://bedtools.readthedocs.io/en/latest/)
+DONE bedGraphToBigWig (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+DONE bigWigAverageOverBed (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+DONE bigWigToBedGraph (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+DONE bigWigMerge (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+
+
+### Enhancer identification from 5'scRNAseq data ###
+
+1) Get whitelist.txt (Cell barcode list) for umi-tools
+Although we can get the whitelist using umi-tools, I use the barcode list provided by CellRanger 
+to proceed with the analysis using same cells that CellRanger recognizes as appropriate cells.
+(This time, I used cellranger-5.0.1)
+ex.
+zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whitelist.txt
+
+2) Extract Cell Barcode and UMI with umi-tools from fastq files
+##UMI-tools: 1.0.1 (I use this version)
+
+ex.(please change the PATH to the working directory) 
+## "CCCCCCCCCCCCCCCCNNNNNNNNNN" means a 16 nt Cell Barcode (10X Barcode) and a 10 nt UMI.
+
+cd /local/home/ubuntu/DATA/ForIFOM/
+umi_tools extract -I /local/home/ubuntu/DATA/ForIFOM/Test_S1_L001_R1_001.fastq.gz \
+--bc-pattern=CCCCCCCCCCCCCCCCNNNNNNNNNN \
+--read2-in=/local/home/ubuntu/DATA/ForIFOM/Test_S1_L001_R2_001.fastq.gz \
+--stdout=/local/home/ubuntu/DATA/ForIFOM/Process_Test_S1_L001_R1_001.fastq.gz \
+--read2-out=/local/home/ubuntu/DATA/ForIFOM/Process_Test_S1_L001_R2_001.fastq.gz \
+--filter-cell-barcode --whitelist=/local/home/ubuntu/DATA/ForIFOM/Test_Whitelist.txt \
+-L ForIFOM_extract.log
+
+3) Trim the TSO sequence (13 nt) with cutadapt from Read1 processed by umi-tools.
+4) Map read1s only using STAR
+5) Deduplicate with umi-tools
+6) Extract reads that start with unencoded-G.
+##cutadapt: 2.8 with python 3.8.5(I use this version)
+##STAR:2.6.0c (I use this version)
+##samtools:1.10 (I use this version)
+##umi-tools: 1.0.1 (I use this version)
+
+ex.(please change the PATH to the working directory and STAR index)
+
+cd /local/home/ubuntu/DATA/ForIFOM/
+mkdir STAR_results
+mkdir STAR_Tmp
+#3) Trim the TSO sequence (13 nt) with cutadapt from Read1 processed by umi-tools.
+cutadapt -u 13 -o /local/home/ubuntu/DATA/ForIFOM/Process_Test_S1_L001_R1_001_trim13.fastq.gz /local/home/ubuntu/DATA/ForIFOM/Process_Test_S1_L001_R1_001.fastq.gz -j 20
+#4) Map read1s only using STAR
+STAR --runThreadN 12 --genomeDir /local/home/ubuntu/Ref/homSap_hg38_GENCODEv34/indexes_STAR-2.6.0c_homSap_GRCh38.p13_GENCODEv34_cmp_chr/ \
+--readFilesIn /local/home/ubuntu/DATA/ForIFOM/Process_Test_S1_L001_R1_001_trim13.fastq.gz \
+--readFilesCommand zcat \
+--outFilterMultimapNmax 1 --outTmpDir /local/home/ubuntu/DATA/ForIFOM/STAR_Tmp/ForIFOM_ \
+--outSAMtype BAM SortedByCoordinate --outFileNamePrefix /local/home/ubuntu/DATA/ForIFOM/STAR_results/ForIFOM_
+
+cd /local/home/ubuntu/DATA/ForIFOM/STAR_results
+
+#5) Deduplicate with umi-tools
+samtools index -@ 8 ForIFOM_Aligned.sortedByCoord.out.bam
+umi_tools dedup --per-cell -I ForIFOM_Aligned.sortedByCoord.out.bam --output-stats=deduplicated -S ForIFOM_deduplicated_Nopairedoption.bam
+
+#6) Extract reads that start with unencoded-G. (UnencodedG.sh)
+mkdir ForSfclG
+mv ForIFOM_deduplicated_Nopairedoption.bam ./ForSfclG
+cd ForSfclG
+/local/home/ubuntu/Scripts/UnencodedG.sh G
+
+7) Extract the unencodedG-bam of cells in the cluster you are intersted in.
+## If you want to call enhancer using all cells, please skip this process.
+## If you want to do this process, please get a cell barcode list in the cluster (ex. ForIFOM_metadata.df_cluster0.txt).
+## This time, I clustered cells using seurat and extract the unencodedG-bam of cells in the cluster "0".
+
+## samtools: 1.10 (I use this version)
+
+cd /local/home/ubuntu/DATA/ForIFOM/STAR_results/ForSfclG
+samtools view -H SoftclipG_ForIFOM_deduplicated_Nopairedoption.bam > cluster0_ForIFOM_header.sam
+samtools view -@ 12 SoftclipG_ForIFOM_deduplicated_Nopairedoption.bam | grep -f /local/home/ubuntu/DATA/ForIFOM/ForIFOM_cluster0_CB.txt > cluster0_ForIFOM.sam
+cat \
+  cluster0_ForIFOM_header.sam \
+  cluster0_ForIFOM.sam \
+ | samtools sort -@ 12 -O bam -o SoftclipG_cluster0_ForIFOM.bam
+rm cluster0_ForIFOM*sam
+
+8) Convert the unencodedG.bam file to the ctss file. (BAMtoCTSS.sh)
+(+ we can check how much reads overlap FANTOM5 promoters and FANTOM5 enhancers)
+
+## bedGraphToBigWig (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+## bigWigAverageOverBed (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+## bigWigToBedGraph (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+## bigWigMerge (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+## samtools: 1.10 (I use this version)
+## bedtools: v2.29.2 (I use this version)
+
+ex.)(please change the PATH to the working directory and STAR index)
+## Please change the PATH to Ref_chrom,Ref_pro1 and Ref_enh in the BAMtoCTSS.sh.
+
+cd /local/home/ubuntu/DATA/ForIFOM/STAR_results/ForSfclG
+mkdir SfclG
+mv SoftclipG* ./SfclG
+cd SfclG
+/local/home/ubuntu/Scripts/BAMtoCTSS.sh
+
+9) Call enhancers using Andersson's script (https://github.com/anderssonrobin/enhancers) with small modifications. (enhancers/scripts/fixed_bidir_enhancers_10bp)
+## bedtools: v2.29.2 (I use this version)
+## Optionally we can get a enhancer bed file with filtered loci (if a mask file is given). 
+## This time, we filtered +-300bp TSSs (of protein coding genes only) regions. (gencode.v34.transcript.ptrcoding.300bpslop.mask.bed)
+## Please change or delete -m option if you want.
+
+9-1) Call enhancers in cluster 0.
+
+cd /local/home/ubuntu/DATA/ForIFOM/STAR_results/ForSfclG/SfclG/SoftclipG_cluster0_ForIFOM
+gunzip *ctss.bed.gz
+mkdir enhancer_300bpmask_RESULTs
+find `pwd` -name SoftclipG_cluster0_ForIFOM_mq20.ctss.bed > SoftclipG_cluster0_ForIFOM_mq20.ctss.txt
+
+cd /local/home/ubuntu/enhancers/scripts/
+CTSS='/local/home/ubuntu/DATA/ForIFOM/STAR_results/ForSfclG/SfclG/SoftclipG_cluster0_ForIFOM'
+MASK='/local/home/ubuntu/Ref/gencode.v34.transcript.ptrcoding.300bpslop.mask.bed'
+./fixed_bidir_enhancers_10bp -s ForIFOM_cluster0_0.8_0_10bp_ -m ${MASK} -t ${CTSS}/enhancer_300bpmask_RESULTs/Tmp_ForIFOM_cluster0_0.8_0_10bp -f ${CTSS}/*ctss.txt -o ${CTSS}/enhancer_300bpmask_RESULTs/Result_ForIFOM_cluster0_0.8_0_10bp
+
+## you can get ./enhancer_300bpmask_RESULTs/Result_ForIFOM_cluster0_0.8_0_10bp/ForIFOM_cluster0_0.8_0_10bp_enhancers.bed
+## ForIFOM_cluster0_0.8_0_10bp_enhancers.bed is enhancer bed file detected from cluster 0. (This time 460 enhancers.)
+
+
+9-2) Call all enhancers.
+
+cd /local/home/ubuntu/DATA/ForIFOM/STAR_results/ForSfclG/SfclG/SoftclipG_ForIFOM_deduplicated_Nopairedoption
+gunzip *ctss.bed.gz
+mkdir enhancer_300bpmask_RESULTs
+find `pwd` -name SoftclipG_ForIFOM_deduplicated_Nopairedoption_mq20.ctss.bed > SoftclipG_ForIFOM_deduplicated_Nopairedoption_mq20.ctss.txt
+
+cd /local/home/ubuntu/enhancers/scripts/
+CTSS='/local/home/ubuntu/DATA/ForIFOM/STAR_results/ForSfclG/SfclG/SoftclipG_ForIFOM_deduplicated_Nopairedoption'
+MASK='/local/home/ubuntu/Ref/gencode.v34.transcript.ptrcoding.300bpslop.mask.bed'
+./fixed_bidir_enhancers_10bp -s ForIFOM_all_0.8_0_10bp_ -m ${MASK} -t ${CTSS}/enhancer_300bpmask_RESULTs/Tmp_ForIFOM_all_0.8_0_10bp -f ${CTSS}/*ctss.txt -o ${CTSS}/enhancer_300bpmask_RESULTs/Result_ForIFOM_all_0.8_0_10bp
+
+## you can get ./enhancer_300bpmask_RESULTs/Result_ForIFOM_all_0.8_0_10bp/ForIFOM_all_0.8_0_10bp_enhancers.bed
+## ForIFOM_all_0.8_0_10bp_enhancers.bed is enhancer bed file detected from the sample. (This time 2,058 enhancers.)
