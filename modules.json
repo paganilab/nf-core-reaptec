@@ -12,6 +12,18 @@
             "multiqc": {
                 "git_sha": "e937c7950af70930d1f34bb961403d9d2aa81c7d"
             },
+            "samtools/index": {
+                "git_sha": "c5235a983d454787fa0c3247b02086969217163b"
+            },
+            "star/align": {
+                "git_sha": "5de3f2c50e063bda30316342b6606b485a12e38c"
+            },
+            "star/genomegenerate": {
+                "git_sha": "f43778b0e641a9643ae73fe1f2fe2d5bb81edffc"
+            },
+            "umitools/dedup": {
+                "git_sha": "2ade120249b92e382f964bd75701befa2c2dc75d"
+            },
             "umitools/extract": {
                 "git_sha": "2ade120249b92e382f964bd75701befa2c2dc75d"
             }

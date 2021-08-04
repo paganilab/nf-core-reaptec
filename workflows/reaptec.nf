@@ -67,7 +67,11 @@ include { MULTIQC } from '../modules/nf-core/modules/multiqc/main' addParams( op
 include { UMITOOLS_EXTRACT } from '../modules/nf-core/modules/umitools/extract/main' addParams( options: modules['umitools_extract'])
 include { CUTADAPT } from '../modules/nf-core/modules/cutadapt/main' addParams( options: modules['cutadapt'] )
 include { GET_WHITELIST } from '../modules/local/get_whitelist' addParams( options: [:] )
-
+include { STAR_GENOMEGENERATE } from '../modules/nf-core/modules/star/genomegenerate/main' addParams( options: modules['star_genomegenerate'])
+include { STAR_ALIGN } from '../modules/nf-core/modules/star/align/main' addParams( options: modules['star_align'])
+include { SAMTOOLS_INDEX } from '../modules/nf-core/modules/samtools/index/main' addParams( options: [:])
+include { UMITOOLS_DEDUP } from '../modules/nf-core/modules/umitools/dedup/main' addParams( options: modules['umitools_dedup'])
+include { UNENCODED_G } from '../modules/local/unencoded_g' addParams( options: [:] )
 /*
 ========================================================================================
     RUN MAIN WORKFLOW
@@ -142,8 +146,45 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
     ch_software_versions = ch_software_versions.mix(CUTADAPT.out.version.ifEmpty(null))
 
 
+// #4) Map read1s only using STAR
+// STAR --runThreadN 12 --genomeDir /local/home/ubuntu/Ref/homSap_hg38_GENCODEv34/indexes_STAR-2.6.0c_homSap_GRCh38.p13_GENCODEv34_cmp_chr/ \
+// --readFilesIn /local/home/ubuntu/DATA/ForIFOM/Process_Test_S1_L001_R1_001_trim13.fastq.gz \
+// --readFilesCommand zcat \
+// --outFilterMultimapNmax 1 --outTmpDir /local/home/ubuntu/DATA/ForIFOM/STAR_Tmp/ForIFOM_ \
+    // --outSAMtype BAM SortedByCoordinate --outFileNamePrefix /local/home/ubuntu/DATA/ForIFOM/STAR_results/ForIFOM_
 
-    
+    STAR_GENOMEGENERATE (
+	params.fasta,
+	params.gtf
+    )
+    ch_software_versions = ch_software_versions.mix(STAR_GENOMEGENERATE.out.version.ifEmpty(null))
+
+
+    STAR_ALIGN (
+	CUTADAPT.out.reads,
+	STAR_GENOMEGENERATE.out.index,
+	params.gtf
+    )
+    ch_software_versions = ch_software_versions.mix(STAR_ALIGN.out.version.ifEmpty(null))
+
+
+    SAMTOOLS_INDEX (
+	STAR_ALIGN.out.bam
+    )
+    ch_software_versions = ch_software_versions.mix(SAMTOOLS_INDEX.out.version.ifEmpty(null))
+
+    UMITOOLS_DEDUP (
+	SAMTOOLS_INDEX.out.bambai
+    )
+    ch_software_versions = ch_software_versions.mix(UMITOOLS_DEDUP.out.version.ifEmpty(null))
+
+    ch_input_unencoded = Channel.from('G')
+    UNENCODED_G (
+	UMITOOLS_DEDUP.out.bam,
+	ch_input_unencoded
+    )
+    ch_software_versions = ch_software_versions.mix(UNENCODED_G.out.version.ifEmpty(null))
+
     //
     // MODULE: Pipeline reporting
     //
@@ -154,6 +195,7 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
         .flatten()
         .collect()
         .set { ch_software_versions }
+
 
     GET_SOFTWARE_VERSIONS (
         ch_software_versions.map { it }.collect()
