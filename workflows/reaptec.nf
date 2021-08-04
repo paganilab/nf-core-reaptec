@@ -11,12 +11,15 @@ WorkflowReaptec.initialise(params, log)
 
 // TODO nf-core: Add all file path parameters for the pipeline to the list below
 // Check input path parameters to see if they exist
-def checkPathParamList = [ params.input, params.multiqc_config, params.fasta ]
+def checkPathParamList = [ params.input,
+			  params.multiqc_config,
+			  params.fasta,
+			  params.barcodes ]
 for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
 
 // Check mandatory parameters
 if (params.input) { ch_input = file(params.input) } else { exit 1, 'Input samplesheet not specified!' }
-
+if (params.barcodes) { ch_barcodes = file(params.barcodes) } else { exit 1, 'Input barcodes not specified!' }
 /*
 ========================================================================================
     CONFIG FILES
@@ -45,6 +48,7 @@ include { GET_SOFTWARE_VERSIONS } from '../modules/local/get_software_versions' 
 //
 include { INPUT_CHECK } from '../subworkflows/local/input_check' addParams( options: [:] )
 
+
 /*
 ========================================================================================
     IMPORT NF-CORE MODULES/SUBWORKFLOWS
@@ -54,11 +58,15 @@ include { INPUT_CHECK } from '../subworkflows/local/input_check' addParams( opti
 def multiqc_options   = modules['multiqc']
 multiqc_options.args += params.multiqc_title ? Utils.joinModuleArgs(["--title \"$params.multiqc_title\""]) : ''
 
+
 //
 // MODULE: Installed directly from nf-core/modules
 //
 include { FASTQC  } from '../modules/nf-core/modules/fastqc/main'  addParams( options: modules['fastqc'] )
 include { MULTIQC } from '../modules/nf-core/modules/multiqc/main' addParams( options: multiqc_options   )
+include { UMITOOLS_EXTRACT } from '../modules/nf-core/modules/umitools/extract/main' addParams( options: modules['umitools_extract'])
+include { CUTADAPT } from '../modules/nf-core/modules/cutadapt/main' addParams( options: modules['cutadapt'] )
+include { GET_WHITELIST } from '../modules/local/get_whitelist' addParams( options: [:] )
 
 /*
 ========================================================================================
@@ -88,6 +96,52 @@ workflow REAPTEC {
     )
     ch_software_versions = ch_software_versions.mix(FASTQC.out.version.first().ifEmpty(null))
 
+
+    /* 1) Get whitelist.txt (Cell barcode list) for umi-tools
+Although we can get the whitelist using umi-tools, I use the barcode list provided by CellRanger 
+to proceed with the analysis using same cells that CellRanger recognizes as appropriate cells.
+(This time, I used cellranger-5.0.1)
+ex.
+zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whitelist.txt
+     */
+
+    GET_WHITELIST (
+	ch_barcodes
+    )
+    ch_software_versions = ch_software_versions.mix(GET_WHITELIST.out.version.ifEmpty(null))
+	
+    /* 2) Extract Cell Barcode and UMI with umi-tools from fastq files
+##UMI-tools: 1.0.1 (I use this version)
+     */
+
+    UMITOOLS_EXTRACT (
+	INPUT_CHECK.out.reads,
+	GET_WHITELIST.out.whitelist
+    )
+    ch_software_versions = ch_software_versions.mix(UMITOOLS_EXTRACT.out.version.ifEmpty(null))
+
+    // tranform the data from paired reads to single reads keeping only R1
+    UMITOOLS_EXTRACT
+	.out
+	.reads
+	.map {
+	    meta, fastq ->
+	        meta.single_end = true
+	    [meta, [fastq[0]]] }
+	.set { ch_just_r1 }
+
+//3) Trim the TSO sequence (13 nt) with cutadapt from Read1 processed by umi-tools.
+// #3) Trim the TSO sequence (13 nt) with cutadapt from Read1 processed by umi-tools.
+// cutadapt -u 13 -o /local/home/ubuntu/DATA/ForIFOM/Process_Test_S1_L001_R1_001_trim13.fastq.gz /local/home/ubuntu/DATA/ForIFOM/Process_Test_S1_L001_R1_001.fastq.gz -j 20
+    
+    CUTADAPT (
+	ch_just_r1
+    )
+    ch_software_versions = ch_software_versions.mix(CUTADAPT.out.version.ifEmpty(null))
+
+
+
+    
     //
     // MODULE: Pipeline reporting
     //
@@ -121,6 +175,9 @@ workflow REAPTEC {
     )
     multiqc_report       = MULTIQC.out.report.toList()
     ch_software_versions = ch_software_versions.mix(MULTIQC.out.version.ifEmpty(null))
+
+
+  
 }
 
 /*
