@@ -126,8 +126,10 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
 	.reads
 	.map {
 	    meta, fastq ->
-	        meta.single_end = true
-	    [meta, [fastq[0]]] }
+	    def paired_to_single_meta = [:]
+	    paired_to_single_meta.id = meta.id
+	    paired_to_single_meta.single_end = true
+	    [paired_to_single_meta, [fastq[0]]] }
 	.set { ch_just_r1 }
 
 //3) Trim the TSO sequence (13 nt) with cutadapt from Read1 processed by umi-tools.
