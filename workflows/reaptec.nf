@@ -14,12 +14,19 @@ WorkflowReaptec.initialise(params, log)
 def checkPathParamList = [ params.input,
 			  params.multiqc_config,
 			  params.fasta,
-			  params.barcodes ]
+			  params.barcodes,
+                          params.ref_chrom,
+                          params.ref_pro1,
+                          params.ref_enh
+]
 for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
 
 // Check mandatory parameters
 if (params.input) { ch_input = file(params.input) } else { exit 1, 'Input samplesheet not specified!' }
 if (params.barcodes) { ch_barcodes = file(params.barcodes) } else { exit 1, 'Input barcodes not specified!' }
+if (params.ref_chrom) { ch_chrom = file(params.ref_chrom) } else { exit 1, 'Input reference chromosome sizes not specified!' }
+if (params.ref_pro1) { ch_pro1 = file(params.ref_pro1) } else { exit 1, 'Input FANTOM5 promoters not specified!' }
+if (params.ref_enh) { ch_enh = file(params.ref_enh) } else { exit 1, 'Input FANTOM5 enhancers not specified!' }
 /*
 ========================================================================================
     CONFIG FILES
@@ -72,6 +79,7 @@ include { STAR_ALIGN } from '../modules/nf-core/modules/star/align/main' addPara
 include { SAMTOOLS_INDEX } from '../modules/nf-core/modules/samtools/index/main' addParams( options: [:])
 include { UMITOOLS_DEDUP } from '../modules/nf-core/modules/umitools/dedup/main' addParams( options: modules['umitools_dedup'])
 include { UNENCODED_G } from '../modules/local/unencoded_g' addParams( options: [:] )
+include { BAM_TO_CTSS } from '../modules/local/bam_to_ctss' addParams( options: [:] )
 /*
 ========================================================================================
     RUN MAIN WORKFLOW
@@ -184,6 +192,60 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
 	ch_input_unencoded
     )
     ch_software_versions = ch_software_versions.mix(UNENCODED_G.out.version.ifEmpty(null))
+
+
+    //TODO: implement the filtering on cell clusters providing the list of barcodes to select
+    
+// 8) Convert the unencodedG.bam file to the ctss file. (BAMtoCTSS.sh)
+// (+ we can check how much reads overlap FANTOM5 promoters and FANTOM5 enhancers)
+
+// ## bedGraphToBigWig (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+// ## bigWigAverageOverBed (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+// ## bigWigToBedGraph (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+// ## bigWigMerge (http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/)
+// ## samtools: 1.10 (I use this version)
+// ## bedtools: v2.29.2 (I use this version)
+
+// ex.)(please change the PATH to the working directory and STAR index)
+// ## Please change the PATH to Ref_chrom,Ref_pro1 and Ref_enh in the BAMtoCTSS.sh.
+
+// cd /local/home/ubuntu/DATA/ForIFOM/STAR_results/ForSfclG
+// mkdir SfclG
+// mv SoftclipG* ./SfclG
+// cd SfclG
+// /local/home/ubuntu/Scripts/BAMtoCTSS.sh
+
+
+    BAM_TO_CTSS (
+	STAR_GENOMEGENERATE.out.index,
+	ch_pro1,
+	ch_enh,
+	UNENCODED_G.out.clipped
+    )
+    ch_software_versions = ch_software_versions.mix(BAM_TO_CTSS.out.version.ifEmpty(null))
+
+// 9-2) Call all enhancers.
+
+// cd /local/home/ubuntu/DATA/ForIFOM/STAR_results/ForSfclG/SfclG/SoftclipG_ForIFOM_deduplicated_Nopairedoption
+// gunzip *ctss.bed.gz
+// mkdir enhancer_300bpmask_RESULTs
+// find `pwd` -name SoftclipG_ForIFOM_deduplicated_Nopairedoption_mq20.ctss.bed > SoftclipG_ForIFOM_deduplicated_Nopairedoption_mq20.ctss.txt
+
+// cd /local/home/ubuntu/enhancers/scripts/
+// CTSS='/local/home/ubuntu/DATA/ForIFOM/STAR_results/ForSfclG/SfclG/SoftclipG_ForIFOM_deduplicated_Nopairedoption'
+// MASK='/local/home/ubuntu/Ref/gencode.v34.transcript.ptrcoding.300bpslop.mask.bed'
+// ./fixed_bidir_enhancers_10bp -s ForIFOM_all_0.8_0_10bp_ -m ${MASK} -t ${CTSS}/enhancer_300bpmask_RESULTs/Tmp_ForIFOM_all_0.8_0_10bp -f ${CTSS}/*ctss.txt -o ${CTSS}/enhancer_300bpmask_RESULTs/Result_ForIFOM_all_0.8_0_10bp
+
+// ## you can get ./enhancer_300bpmask_RESULTs/Result_ForIFOM_all_0.8_0_10bp/ForIFOM_all_0.8_0_10bp_enhancers.bed
+// ## ForIFOM_all_0.8_0_10bp_enhancers.bed is enhancer bed file detected from the sample. (This time 2,058 enhancers.)
+
+    // CALL_ENHANCERS (
+
+    // )
+    // ch_software_versions = ch_software_versions.mix(CALL_ENHANCERS.out.version.ifEmpty(null))
+
+
+
 
     //
     // MODULE: Pipeline reporting

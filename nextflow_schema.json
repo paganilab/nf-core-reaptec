@@ -12,7 +12,10 @@
             "description": "Define where the pipeline should find input data and save output data.",
             "required": [
                 "input",
-		"barcodes"
+		"barcodes",
+		"ref_chrom",
+		"ref_pro1",
+		"ref_enh"
             ],
             "properties": {
                 "input": {
@@ -48,6 +51,21 @@
 		    "description": "Path to barcode list provided by CellRanger",
 		    "help_text": "The barcode `filtered_feature_bc_matrix/barcodes.tsv.gz` provided by CellRanger",
 		    "pattern": ".*/filtered_feature_bc_matrix/barcodes.tsv.gz$"
+		},
+		"ref_chrom": {
+		    "type": "string",
+		    "description": "Path to chromosome sizes",
+		    "help_text": "The sizes of the chromosomes."
+		},
+		"ref_pro1": {
+		    "type": "string",
+		    "description": "Path to FANTOM5 promoters",
+		    "help_text": "The FANTOM5 promoters list "
+		},
+		"ref_enh": {
+		    "type": "string",
+		    "description": "Path to FANTOM5 enhancers",
+		    "help_text": "The FANTOM5 enhancers list"
 		}
 	    }
         },
