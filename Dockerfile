@@ -129,6 +129,10 @@ ADD http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bigWigAverageOverBed /
 ADD http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bigWigToBedGraph /usr/local/bin/
 ADD http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bigWigMerge /usr/local/bin/
 
+RUN chmod +x /usr/local/bin/bedGraphToBigWig \
+             /usr/local/bin/bigWigAverageOverBed \
+	     /usr/local/bin/bigWigToBedGraph \
+	     /usr/local/bin/bigWigMerge
     
 ENTRYPOINT [ "/usr/bin/tini", "--" ]
 CMD [ "/bin/bash" ]
