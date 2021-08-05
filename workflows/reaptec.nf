@@ -17,7 +17,8 @@ def checkPathParamList = [ params.input,
 			  params.barcodes,
                           params.ref_chrom,
                           params.ref_pro1,
-                          params.ref_enh
+                          params.ref_enh,
+			  params.enhancers_mask
 ]
 for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
 
@@ -27,6 +28,8 @@ if (params.barcodes) { ch_barcodes = file(params.barcodes) } else { exit 1, 'Inp
 if (params.ref_chrom) { ch_chrom = file(params.ref_chrom) } else { exit 1, 'Input reference chromosome sizes not specified!' }
 if (params.ref_pro1) { ch_pro1 = file(params.ref_pro1) } else { exit 1, 'Input FANTOM5 promoters not specified!' }
 if (params.ref_enh) { ch_enh = file(params.ref_enh) } else { exit 1, 'Input FANTOM5 enhancers not specified!' }
+if (params.enhancers_mask) { ch_enhancers_mask = file(params.enhancers_mask) } else { exit 1, 'Input enhancers mask not specified!' }
+if (params.enhancers_prefix) { ch_enhancers_prefix = params.enhancers_prefix } else { exit 1, 'Input prefix for the final call of the enhancers not specified!' }
 /*
 ========================================================================================
     CONFIG FILES
@@ -79,7 +82,8 @@ include { STAR_ALIGN } from '../modules/nf-core/modules/star/align/main' addPara
 include { SAMTOOLS_INDEX } from '../modules/nf-core/modules/samtools/index/main' addParams( options: [:])
 include { UMITOOLS_DEDUP } from '../modules/nf-core/modules/umitools/dedup/main' addParams( options: modules['umitools_dedup'])
 include { UNENCODED_G } from '../modules/local/unencoded_g' addParams( options: [:] )
-include { BAM_TO_CTSS } from '../modules/local/bam_to_ctss' addParams( options: [:] )
+include { BAM_TO_CTSS } from '../modules/local/bam_to_ctss' addParams( options: modules['bam_to_ctss'] )
+include { CALL_ENHANCERS } from '../modules/local/call_enhancers' addParams( options: modules['call_enhancers'] )
 /*
 ========================================================================================
     RUN MAIN WORKFLOW
@@ -250,10 +254,12 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
 // ## you can get ./enhancer_300bpmask_RESULTs/Result_ForIFOM_all_0.8_0_10bp/ForIFOM_all_0.8_0_10bp_enhancers.bed
 // ## ForIFOM_all_0.8_0_10bp_enhancers.bed is enhancer bed file detected from the sample. (This time 2,058 enhancers.)
 
-    // CALL_ENHANCERS (
-
-    // )
-    // ch_software_versions = ch_software_versions.mix(CALL_ENHANCERS.out.version.ifEmpty(null))
+    CALL_ENHANCERS (
+	BAM_TO_CTSS.out.ctss,
+	ch_enhancers_mask,
+	ch_enhancers_prefix
+    )
+    ch_software_versions = ch_software_versions.mix(CALL_ENHANCERS.out.version.ifEmpty(null))
 
 
 

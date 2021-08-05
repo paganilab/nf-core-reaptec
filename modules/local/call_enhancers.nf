@@ -4,7 +4,7 @@ include { initOptions; saveFiles; getSoftwareName } from './functions'
 params.options = [:]
 options        = initOptions(params.options)
 
-process BAM_TO_CTSS {
+process CALL_ENHANCERS {
     tag "$meta.id"
     label 'process_medium'
     publishDir "${params.outdir}",
@@ -20,23 +20,21 @@ process BAM_TO_CTSS {
     }
 
     input:
-    path(index) // STAR index path
-    path(promoters_bed)
-    path(enhancers_bed)
-    tuple val(meta), path(bam)
+    tuple val(meta), path(ctss)
+    path(mask)
+    val(prefix)
 
     output:
-    tuple val(meta), path("*_mq20.ctss.bed.gz")  , emit: ctss
-    tuple val(meta), path("*_promoter.count.txt"), emit: promoters
-    tuple val(meta), path("*_enhancer.count.txt"), emit: enhancers
-    tuple val(meta), path("*bw")
+    tuple val(meta), path("output"), emit: enhancers
     tuple val(meta), path("*.log"), emit: log
     path "*.version.txt", emit: version
 
     script:
-    def software = 'bam_to_ctss'//getSoftwareName(task.process)
+    def software = 'call_enhancers' //getSoftwareName(task.process)
     """
-    BAMtoCTSS.sh ${index}/chrNameLength.txt $promoters_bed $enhancers_bed $bam ${task.cpus} > ${software}.log 2>&1
+    gunzip -c ${ctss} > ctss.bed
+    echo "ctss.bed" > ctss.txt
+    fixed_bidir_enhancers_10bp -s ${prefix}_ -m $mask -t tmp -f ctss.txt -o output > ${software}.log 2>&1
     echo '0.0.1' > ${software}.version.txt
     """
 }

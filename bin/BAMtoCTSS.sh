@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 Ref_chrom=$1 #'/local/home/ubuntu/Ref/homSap_v33/GRCh38.p13.genome.chrom.sizes'
 Ref_pro1=$2 #'/local/home/ubuntu/Ref/FANTOM5_hg38/homSap_hg38_fair+new_CAGE_peaks_phase1and2.anno.bed'
 Ref_enh=$3 #'/local/home/ubuntu/Ref/FANTOM5_hg38/homSap_hg38_permissive_enhancer.bed'

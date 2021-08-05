@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ## How to run this Script, for example :
 ## bash thisScript.sh G > xxx.log 2>&1
 ## or
