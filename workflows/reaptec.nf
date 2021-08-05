@@ -176,6 +176,10 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
     ch_software_versions = ch_software_versions.mix(STAR_ALIGN.out.version.ifEmpty(null))
 
 
+//     #5) Deduplicate with umi-tools
+// samtools index -@ 8 ForIFOM_Aligned.sortedByCoord.out.bam
+// umi_tools dedup --per-cell -I ForIFOM_Aligned.sortedByCoord.out.bam --output-stats=deduplicated -S ForIFOM_deduplicated_Nopairedoption.bam
+
     SAMTOOLS_INDEX (
 	STAR_ALIGN.out.bam
     )
@@ -185,6 +189,13 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
 	SAMTOOLS_INDEX.out.bambai
     )
     ch_software_versions = ch_software_versions.mix(UMITOOLS_DEDUP.out.version.ifEmpty(null))
+
+
+//     #6) Extract reads that start with unencoded-G. (UnencodedG.sh)
+// mkdir ForSfclG
+// mv ForIFOM_deduplicated_Nopairedoption.bam ./ForSfclG
+// cd ForSfclG
+// /local/home/ubuntu/Scripts/UnencodedG.sh G
 
     ch_input_unencoded = Channel.from('G')
     UNENCODED_G (
