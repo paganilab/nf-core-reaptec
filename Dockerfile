@@ -5,7 +5,7 @@ LABEL eu.ifom.bioinformatics.packages.docker.maintainer="raoul.bonnal@ifom.eu"
 LABEL authors="Akiko Oguchi <aoguchi@kuhp.kyoto-u.ac.jp>,Raoul J.P. Bonnal <raoul.bonnal@ifom.eu>,Yasuhiro Murakawa <yasuhiro.murakawa@riken.jp>" \
       description="Docker image containing all software requirements for the nf-core/reaptec pipeline"
 
-LABEL version="0.0.1"
+LABEL version="0.0.2"
 
 
 ENV TINI_VERSION="v0.18.0"
@@ -133,6 +133,8 @@ RUN chmod +x /usr/local/bin/bedGraphToBigWig \
              /usr/local/bin/bigWigAverageOverBed \
 	     /usr/local/bin/bigWigToBedGraph \
 	     /usr/local/bin/bigWigMerge
-    
+
+RUN apt-get install -y pigz
+
 ENTRYPOINT [ "/usr/bin/tini", "--" ]
 CMD [ "/bin/bash" ]
