@@ -31,7 +31,7 @@ process UNENCODED_G {
     script:
     def software = getSoftwareName(task.process)
     """
-    UnencodedG.sh ${base} ${task.cpus} > ${software}.log 2>&1
+    UnencodedG.sh ${bam} ${base} ${task.cpus} > ${software}.log 2>&1
     echo '0.0.1' > ${software}.version.txt
     """
 }
