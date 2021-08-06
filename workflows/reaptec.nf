@@ -190,7 +190,8 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
     ch_software_versions = ch_software_versions.mix(SAMTOOLS_INDEX.out.version.ifEmpty(null))
 
     UMITOOLS_DEDUP (
-	SAMTOOLS_INDEX.out.bambai
+	// combines the bam with its bai
+	STAR_ALIGN.out.bam.join(SAMTOOLS_INDEX.out.bai, by: [0])
     )
     ch_software_versions = ch_software_versions.mix(UMITOOLS_DEDUP.out.version.ifEmpty(null))
 
