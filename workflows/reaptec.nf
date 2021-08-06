@@ -67,12 +67,15 @@ include { INPUT_CHECK } from '../subworkflows/local/input_check' addParams( opti
 
 def multiqc_options   = modules['multiqc']
 multiqc_options.args += params.multiqc_title ? Utils.joinModuleArgs(["--title \"$params.multiqc_title\""]) : ''
+def cat_fastq_options          = modules['cat_fastq']
+if (!params.save_merged_fastq) { cat_fastq_options['publish_files'] = false }
 
 
 //
 // MODULE: Installed directly from nf-core/modules
 //
 include { FASTQC  } from '../modules/nf-core/modules/fastqc/main'  addParams( options: modules['fastqc'] )
+include { CAT_FASTQ} from '../modules/nf-core/modules/cat/fastq/main' addParams( options: cat_fastq_options)
 include { MULTIQC } from '../modules/nf-core/modules/multiqc/main' addParams( options: multiqc_options   )
 include { UMITOOLS_EXTRACT } from '../modules/nf-core/modules/umitools/extract/main' addParams( options: modules['umitools_extract'])
 include { CUTADAPT } from '../modules/nf-core/modules/cutadapt/main' addParams( options: modules['cutadapt'] )
@@ -100,15 +103,36 @@ workflow REAPTEC {
     //
     // SUBWORKFLOW: Read in samplesheet, validate and stage input files
     //
-    INPUT_CHECK (
+   INPUT_CHECK (
         ch_input
     )
+    .map {
+            meta, fastq ->
+            meta.id = meta.id.split('_')[0..-2].join('_')
+            [ meta, fastq ] }
+    .groupTuple(by: [0])
+    .branch {
+        meta, fastq ->
+            single  : fastq.size() == 1
+                return [ meta, fastq.flatten() ]
+            multiple: fastq.size() > 1
+                return [ meta, fastq.flatten() ]
+    }
+    .set { ch_fastq }
 
+    //
+    // MODULE: Concatenate FastQ files from same sample if required
+    //
+    CAT_FASTQ (
+        ch_fastq.multiple
+    )
+    .mix(ch_fastq.single)
+    .set { ch_cat_fastq }
     //
     // MODULE: Run FastQC
     //
     FASTQC (
-        INPUT_CHECK.out.reads
+        ch_fastq.multiple
     )
     ch_software_versions = ch_software_versions.mix(FASTQC.out.version.first().ifEmpty(null))
 
@@ -131,7 +155,7 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
      */
 
     UMITOOLS_EXTRACT (
-	INPUT_CHECK.out.reads,
+	ch_cat_fastq,
 	GET_WHITELIST.out.whitelist
     )
     ch_software_versions = ch_software_versions.mix(UMITOOLS_EXTRACT.out.version.ifEmpty(null))
@@ -146,14 +170,14 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
 	    paired_to_single_meta.id = meta.id
 	    paired_to_single_meta.single_end = true
 	    [paired_to_single_meta, [fastq[0]]] }
-	.set { ch_just_r1 }
+	.set { ch_fastq_r1 }
 
 //3) Trim the TSO sequence (13 nt) with cutadapt from Read1 processed by umi-tools.
 // #3) Trim the TSO sequence (13 nt) with cutadapt from Read1 processed by umi-tools.
 // cutadapt -u 13 -o /local/home/ubuntu/DATA/ForIFOM/Process_Test_S1_L001_R1_001_trim13.fastq.gz /local/home/ubuntu/DATA/ForIFOM/Process_Test_S1_L001_R1_001.fastq.gz -j 20
     
     CUTADAPT (
-	ch_just_r1
+	ch_fastq_r1
     )
     ch_software_versions = ch_software_versions.mix(CUTADAPT.out.version.ifEmpty(null))
 
