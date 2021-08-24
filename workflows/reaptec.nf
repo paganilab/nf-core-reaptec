@@ -74,19 +74,22 @@ if (!params.save_merged_fastq) { cat_fastq_options['publish_files'] = false }
 //
 // MODULE: Installed directly from nf-core/modules
 //
-include { FASTQC  } from '../modules/nf-core/modules/fastqc/main'  addParams( options: modules['fastqc'] )
-include { CAT_FASTQ} from '../modules/nf-core/modules/cat/fastq/main' addParams( options: cat_fastq_options)
-include { MULTIQC } from '../modules/nf-core/modules/multiqc/main' addParams( options: multiqc_options   )
-include { UMITOOLS_EXTRACT } from '../modules/nf-core/modules/umitools/extract/main' addParams( options: modules['umitools_extract'])
-include { CUTADAPT } from '../modules/nf-core/modules/cutadapt/main' addParams( options: modules['cutadapt'] )
-include { GET_WHITELIST } from '../modules/local/get_whitelist' addParams( options: [:] )
+include { FASTQC  }             from '../modules/nf-core/modules/fastqc/main'  addParams( options: modules['fastqc'] )
+include { CAT_FASTQ}            from '../modules/nf-core/modules/cat/fastq/main' addParams( options: cat_fastq_options)
+include { MULTIQC }             from '../modules/nf-core/modules/multiqc/main' addParams( options: multiqc_options   )
+include { UMITOOLS_EXTRACT }    from '../modules/nf-core/modules/umitools/extract/main' addParams( options: modules['umitools_extract'])
+include { CUTADAPT }            from '../modules/nf-core/modules/cutadapt/main' addParams( options: modules['cutadapt'] )
+include { GET_WHITELIST }       from '../modules/local/get_whitelist' addParams( options: [:] )
 include { STAR_GENOMEGENERATE } from '../modules/nf-core/modules/star/genomegenerate/main' addParams( options: modules['star_genomegenerate'])
-include { STAR_ALIGN } from '../modules/nf-core/modules/star/align/main' addParams( options: modules['star_align'])
-include { SAMTOOLS_INDEX } from '../modules/nf-core/modules/samtools/index/main' addParams( options: [:])
-include { UMITOOLS_DEDUP } from '../modules/nf-core/modules/umitools/dedup/main' addParams( options: modules['umitools_dedup'])
-include { UNENCODED_G } from '../modules/local/unencoded_g' addParams( options: [:] )
-include { BAM_TO_CTSS } from '../modules/local/bam_to_ctss' addParams( options: modules['bam_to_ctss'] )
-include { CALL_ENHANCERS } from '../modules/local/call_enhancers' addParams( options: modules['call_enhancers'] )
+include { STAR_ALIGN }          from '../modules/nf-core/modules/star/align/main' addParams( options: modules['star_align'])
+include { SAMTOOLS_INDEX }      from '../modules/nf-core/modules/samtools/index/main' addParams( options: [:])
+include { UMITOOLS_DEDUP }      from '../modules/nf-core/modules/umitools/dedup/main' addParams( options: modules['umitools_dedup'])
+include { UNENCODED_G }         from '../modules/local/unencoded_g' addParams( options: [:] )
+include { BAM_TO_CTSS }         from '../modules/local/bam_to_ctss' addParams( options: modules['bam_to_ctss'] )
+include { CALL_ENHANCERS }      from '../modules/local/call_enhancers' addParams( options: modules['call_enhancers'] )
+include {
+    GUNZIP as GUNZIP_FASTA
+    GUNZIP as GUNZIP_GTF }      from '../modules/nf-core/modules/gunzip/main' addParams( options: [:] )
 /*
 ========================================================================================
     RUN MAIN WORKFLOW
