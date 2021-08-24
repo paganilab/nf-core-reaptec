@@ -51,8 +51,7 @@
 		"barcodes": {
 		    "type": "string",
 		    "description": "Path to barcode list provided by CellRanger",
-		    "help_text": "The barcode `filtered_feature_bc_matrix/barcodes.tsv.gz` provided by CellRanger",
-		    "pattern": ".*/filtered_feature_bc_matrix/barcodes.tsv.gz$"
+		    "help_text": "The barcode `filtered_feature_bc_matrix/barcodes.tsv.gz` provided by CellRanger"
 		},
 		"ref_chrom": {
 		    "type": "string",
