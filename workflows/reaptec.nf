@@ -189,9 +189,29 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
 // --outFilterMultimapNmax 1 --outTmpDir /local/home/ubuntu/DATA/ForIFOM/STAR_Tmp/ForIFOM_ \
     // --outSAMtype BAM SortedByCoordinate --outFileNamePrefix /local/home/ubuntu/DATA/ForIFOM/STAR_results/ForIFOM_
 
+    // ref: https://github.com/nf-core/rnaseq/blob/master/subworkflows/local/prepare_genome.nf#L46
+    //
+    // Uncompress genome fasta file if required
+    //
+    if (params.fasta.endsWith('.gz')) {
+        ch_genome_fasta = GUNZIP_FASTA ( params.fasta ).gunzip
+    } else {
+        ch_genome_fasta = file(params.fasta)
+    }
+
+    // ref: https://github.com/nf-core/rnaseq/blob/master/subworkflows/local/prepare_genome.nf#L55
+    //
+    // Uncompress GTF annotation file or create from GFF3 if required
+    //
+    if (params.gtf.endsWith('.gz')) {
+        ch_genome_gtf = GUNZIP_GTF ( params.gtf ).gunzip
+    } else {
+        ch_genome_gtf = file(params.gtf)
+    }
+
     STAR_GENOMEGENERATE (
-	params.fasta,
-	params.gtf
+	ch_genome_fasta,
+	ch_genome_gtf
     )
     ch_software_versions = ch_software_versions.mix(STAR_GENOMEGENERATE.out.version.ifEmpty(null))
 
