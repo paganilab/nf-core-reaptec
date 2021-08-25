@@ -222,7 +222,7 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
     STAR_ALIGN (
 	CUTADAPT.out.reads,
 	STAR_GENOMEGENERATE.out.index,
-	params.gtf
+	ch_genome_gtf
     )
     ch_software_versions = ch_software_versions.mix(STAR_ALIGN.out.version.ifEmpty(null))
 
