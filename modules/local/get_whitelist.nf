@@ -26,7 +26,7 @@ process GET_WHITELIST {
 
     script:
     def software = getSoftwareName(task.process)
-    def reader = barcodes.endsWith('gz') ? "zcat" : "cat"
+    def reader = barcodes.name.endsWith('gz') ? "zcat" : "cat"
     """
     ${reader} ${barcodes} | sed -e 's/-1.*\$//g' > WhiteList.txt
     echo '0.5.0' > ${software}.version.txt
