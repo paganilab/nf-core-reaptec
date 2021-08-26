@@ -70,26 +70,30 @@ multiqc_options.args += params.multiqc_title ? Utils.joinModuleArgs(["--title \"
 def cat_fastq_options          = modules['cat_fastq']
 if (!params.save_merged_fastq) { cat_fastq_options['publish_files'] = false }
 
+params.star_index_options   = [:]
 
 //
 // MODULE: Installed directly from nf-core/modules
 //
-include { FASTQC  }             from '../modules/nf-core/modules/fastqc/main'  addParams( options: modules['fastqc'] )
-include { CAT_FASTQ}            from '../modules/nf-core/modules/cat/fastq/main' addParams( options: cat_fastq_options)
-include { MULTIQC }             from '../modules/nf-core/modules/multiqc/main' addParams( options: multiqc_options   )
-include { UMITOOLS_EXTRACT }    from '../modules/nf-core/modules/umitools/extract/main' addParams( options: modules['umitools_extract'])
-include { CUTADAPT }            from '../modules/nf-core/modules/cutadapt/main' addParams( options: modules['cutadapt'] )
-include { GET_WHITELIST }       from '../modules/local/get_whitelist' addParams( options: [:] )
+include { FASTQC  }             from '../modules/nf-core/modules/fastqc/main'              addParams( options: modules['fastqc'] )
+include { CAT_FASTQ}            from '../modules/nf-core/modules/cat/fastq/main'           addParams( options: cat_fastq_options)
+include { MULTIQC }             from '../modules/nf-core/modules/multiqc/main'             addParams( options: multiqc_options   )
+include { UMITOOLS_EXTRACT }    from '../modules/nf-core/modules/umitools/extract/main'    addParams( options: modules['umitools_extract'])
+include { CUTADAPT }            from '../modules/nf-core/modules/cutadapt/main'            addParams( options: modules['cutadapt'] )
+include { GET_WHITELIST }       from '../modules/local/get_whitelist'                      addParams( options: [:] )
 include { STAR_GENOMEGENERATE } from '../modules/nf-core/modules/star/genomegenerate/main' addParams( options: modules['star_genomegenerate'])
-include { STAR_ALIGN }          from '../modules/nf-core/modules/star/align/main' addParams( options: modules['star_align'])
-include { SAMTOOLS_INDEX }      from '../modules/nf-core/modules/samtools/index/main' addParams( options: [:])
-include { UMITOOLS_DEDUP }      from '../modules/nf-core/modules/umitools/dedup/main' addParams( options: modules['umitools_dedup'])
-include { UNENCODED_G }         from '../modules/local/unencoded_g' addParams( options: [:] )
-include { BAM_TO_CTSS }         from '../modules/local/bam_to_ctss' addParams( options: modules['bam_to_ctss'] )
-include { CALL_ENHANCERS }      from '../modules/local/call_enhancers' addParams( options: modules['call_enhancers'] )
+include { STAR_ALIGN }          from '../modules/nf-core/modules/star/align/main'          addParams( options: modules['star_align'])
+include { SAMTOOLS_INDEX }      from '../modules/nf-core/modules/samtools/index/main'      addParams( options: [:])
+include { UMITOOLS_DEDUP }      from '../modules/nf-core/modules/umitools/dedup/main'      addParams( options: modules['umitools_dedup'])
+include { UNENCODED_G }         from '../modules/local/unencoded_g'                        addParams( options: [:] )
+include { BAM_TO_CTSS }         from '../modules/local/bam_to_ctss'                        addParams( options: modules['bam_to_ctss'] )
+include { CALL_ENHANCERS }      from '../modules/local/call_enhancers'                     addParams( options: modules['call_enhancers'] )
 include {
     GUNZIP as GUNZIP_FASTA
-    GUNZIP as GUNZIP_GTF }      from '../modules/nf-core/modules/gunzip/main' addParams( options: [:] )
+    GUNZIP as GUNZIP_GTF }      from '../modules/nf-core/modules/gunzip/main'              addParams( options: [:] )
+include {
+    UNTAR as UNTAR_STAR_INDEX } from '../modules/nf-core/modules/untar/main'               addParams( options: params.star_index_options   )
+
 /*
 ========================================================================================
     RUN MAIN WORKFLOW
@@ -137,7 +141,7 @@ workflow REAPTEC {
     FASTQC (
         ch_fastq.multiple
     )
-    ch_software_versions = ch_software_versions.mix(FASTQC.out.version.first().ifEmpty(null))
+    ch_software_versions = ch_software_versions.mix(FASTQC.out.version.ifEmpty(null))
 
 
     /* 1) Get whitelist.txt (Cell barcode list) for umi-tools
@@ -192,16 +196,6 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
 // --outFilterMultimapNmax 1 --outTmpDir /local/home/ubuntu/DATA/ForIFOM/STAR_Tmp/ForIFOM_ \
     // --outSAMtype BAM SortedByCoordinate --outFileNamePrefix /local/home/ubuntu/DATA/ForIFOM/STAR_results/ForIFOM_
 
-    // ref: https://github.com/nf-core/rnaseq/blob/master/subworkflows/local/prepare_genome.nf#L46
-    //
-    // Uncompress genome fasta file if required
-    //
-    if (params.fasta.endsWith('.gz')) {
-        ch_genome_fasta = GUNZIP_FASTA ( params.fasta ).gunzip
-    } else {
-        ch_genome_fasta = file(params.fasta)
-    }
-
     // ref: https://github.com/nf-core/rnaseq/blob/master/subworkflows/local/prepare_genome.nf#L55
     //
     // Uncompress GTF annotation file or create from GFF3 if required
@@ -212,16 +206,40 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
         ch_genome_gtf = file(params.gtf)
     }
 
-    STAR_GENOMEGENERATE (
-	ch_genome_fasta,
-	ch_genome_gtf
-    )
-    ch_software_versions = ch_software_versions.mix(STAR_GENOMEGENERATE.out.version.ifEmpty(null))
+    // Ref: https://github.com/nf-core/rnaseq/blob/master/subworkflows/local/prepare_genome.nf#L126
+    // Uncompress STAR index or generate from scratch if required
+    //
+    ch_star_index   = Channel.empty()
+    ch_star_version = Channel.empty()
+    if (params.star_index) {
+
+        if (params.star_index.endsWith('.tar.gz')) {
+            ch_star_index = UNTAR_STAR_INDEX ( params.star_index ).untar
+        } else {
+            ch_star_index = file(params.star_index)
+        }
+    } else {
+
+	// ref: https://github.com/nf-core/rnaseq/blob/master/subworkflows/local/prepare_genome.nf#L46
+	//
+	// Uncompress genome fasta file if required
+	//
+	if (params.fasta.endsWith('.gz')) {
+            ch_genome_fasta = GUNZIP_FASTA ( params.fasta ).gunzip
+        } else {
+            ch_genome_fasta = file(params.fasta)
+        }
+
+        ch_star_index   = STAR_GENOMEGENERATE ( ch_genome_fasta, ch_genome_gtf ).index
+        ch_star_version = STAR_GENOMEGENERATE.out.version
+    }
+
+    ch_software_versions = ch_software_versions.mix(ch_star_version.ifEmpty(null))
 
 
     STAR_ALIGN (
 	CUTADAPT.out.reads,
-	STAR_GENOMEGENERATE.out.index,
+	ch_star_index,
 	ch_genome_gtf
     )
     ch_software_versions = ch_software_versions.mix(STAR_ALIGN.out.version.ifEmpty(null))
@@ -280,7 +298,7 @@ zcat ./filtered_feature_bc_matrix/barcodes.tsv.gz | sed -e 's/-1//g' > Test_Whit
 
 
     BAM_TO_CTSS (
-	STAR_GENOMEGENERATE.out.index,
+	ch_star_index,
 	ch_pro1,
 	ch_enh,
 	UNENCODED_G.out.clipped

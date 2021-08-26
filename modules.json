@@ -32,6 +32,9 @@
             },
             "umitools/extract": {
                 "git_sha": "2ade120249b92e382f964bd75701befa2c2dc75d"
+            },
+            "untar": {
+                "git_sha": "e937c7950af70930d1f34bb961403d9d2aa81c7d"
             }
         }
     }
