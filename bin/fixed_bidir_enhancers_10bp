@@ -26,7 +26,7 @@ FILTER=""        # Bed file with masked regions for negative filtering of bidire
 TEMP=""          # Temporary directory to use
 DIST=400         # Maximum distance between divergent tag clusters to be considered the same bidirectional loci (default 400)
 WIN=200          # Size of flanking windows around mid points to consider when quantifying the expression of bidirectional transcribed loci (default 200)
-DIR=0.9999999999          # Directionality threshold in (0,1) for filtering enhancers (default 0.8)
+DIR=0.8          # Directionality threshold in (0,1) for filtering enhancers (default 0.8)
 RMTMP=1
 
 echoerr() { echo "$@" 1>&2; }
